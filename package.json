@@ -1,0 +1,58 @@
+{
+  "name": "hn",
+  "version": "1.0.0",
+  "description": "Agent-first CLI for Hacker News research — JSON output, no auth, Firebase + Algolia",
+  "type": "module",
+  "bin": {
+    "hn": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup",
+    "prepare": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nachoal/hn.git"
+  },
+  "homepage": "https://github.com/nachoal/hn#readme",
+  "bugs": {
+    "url": "https://github.com/nachoal/hn/issues"
+  },
+  "keywords": [
+    "hacker-news",
+    "hackernews",
+    "cli",
+    "agent",
+    "research",
+    "algolia",
+    "json",
+    "claude-code",
+    "codex",
+    "skills"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.19.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
