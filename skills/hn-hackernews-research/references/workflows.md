@@ -4,23 +4,28 @@ Longer patterns for when the cheat sheet in SKILL.md is not enough. Every comman
 
 ## 1. "What does HN think about X?" (opinion read)
 
-```bash
-# Candidate threads: relevance-ranked, popular, last year
-hn search -q "<topic>" --since 1y --min-points 20 --limit 50 > /tmp/hits.json
+Algolia ANDs every word of `-q`, so a single phrase under-covers a *topic* ("local llm" misses "…30B model for local agents"). Start wide with synonyms, then filter by eye.
 
-# Rank by engagement and keep the top 5
-jq '.items | sort_by(-.num_comments) | .[:5] | .[] | {id, title, points, num_comments, hn_url}' /tmp/hits.json
+```bash
+# Candidate threads across synonyms, last year, popular — one request per keyword
+hn digest --keywords "<topic>,<synonym>,<synonym>,<product name>" --since 1y --min-points 20 --limit 50 > /tmp/digest.json
+
+# Merge buckets, dedupe, drop off-topic titles (matching is lexical!), rank by engagement
+jq '[.buckets[].items[]] | unique_by(.id)
+    | map(select(.title | test("<word>|<word>"; "i")))
+    | sort_by(-.num_comments) | .[:5] | .[] | {id, title, points, num_comments, hn_url}' /tmp/digest.json
 
 # Pull each thread, top-level comments first (level-order truncation)
-for id in $(jq -r '.items | sort_by(-.num_comments) | .[:5] | .[].id' /tmp/hits.json); do
-  hn thread get "$id" --max-comments 80 --flat > "/tmp/thread-$id.json"
+for id in $(jq -r '[.buckets[].items[]] | unique_by(.id) | sort_by(-.num_comments) | .[:5] | .[].id' /tmp/digest.json); do
+  hn thread get "$id" --max-comments 100 --flat > "/tmp/thread-$id.json"
 done
 
-# Author + first 300 chars of every kept comment
+# Top-level comments (depth is 0-based) with reply counts, then everything else
+jq -r '.comments[] | select(.depth == 0) | "\(.author) [\(.reply_count) replies]: \(.text // "" | .[0:300])"' /tmp/thread-*.json
 jq -r '.comments[] | "\(.author) [d\(.depth)]: \(.text // "" | .[0:300])"' /tmp/thread-*.json
 ```
 
-Read `story.text` for Ask/Show posts. Summarize: main positions, strongest objections, notable dissent, anything from people claiming first-hand experience. Cite `hn_url`s.
+Read `story.text` for Ask/Show posts. Summarize: main positions, strongest objections, notable dissent, anything from people claiming first-hand experience. Cite `hn_url`s. Use `hn search -q "<exact phrase>"` instead when the user names a specific product, error message, or title.
 
 ## 2. Thread deep-dive / summary
 

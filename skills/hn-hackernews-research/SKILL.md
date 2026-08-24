@@ -48,6 +48,8 @@ Every success is one JSON object. Shapes:
 
 Item fields (identical whichever API served it): `id, type (story|ask|show|job|poll|comment), title, url, domain, author, points, num_comments, created_at, text, hn_url, rank?`. Comments: `id, author, text, created_at, parent_id, story_id, depth, reply_count, replies[], hn_url` (+ `story_title` in search results). HTML is already converted to plain text.
 
+Comment tree semantics: `depth` is **0-based** (top-level comments have `depth: 0`); the `--depth N` flag keeps N levels (`--depth 1` = top-level only). `--flat` puts every comment in one array in reading order with `replies: []` — nothing is duplicated, `depth`/`parent_id` still tell you where it sat. `reply_count` counts direct replies in the full tree, even ones pruned by `--max-comments`/`--depth`.
+
 `_meta` tells you what it cost: `{ source: firebase|algolia|mixed, requests, endpoints, fetched_at, note? }`. Read `note` — it flags truncation, the 1,000-hit cap, or index lag.
 
 Errors: `{ error, message|details, hint }` on stderr, exit 1. `NotFoundError` means the id/user does not exist (or is not indexed yet); `HnApiError` with `status_code` 0 is a network problem.
@@ -60,7 +62,8 @@ Use `--pretty` only when showing output to the user; omit it when piping.
 # Ranked feeds (Firebase ranking, 1-2 requests per page)
 hn top|new|best|ask|show|jobs [--limit 30] [--page 1] [--live] [--no-jobs]
 
-# Search — the workhorse (Algolia)
+# Search — the workhorse (Algolia). Query words are ANDed: "local llm" only matches items
+# containing both words. For a *topic*, use `digest` with synonyms instead (see below).
 hn search -q "<text>" [--type story|ask|show|poll|job|comment|all] [--comments]
           [--sort relevance|date] [--since 7d | --after YYYY-MM-DD] [--before YYYY-MM-DD]
           [--min-points N] [--min-comments N] [--author <user>] [--in title|url|text]
@@ -78,7 +81,7 @@ hn user get <name> | posts <name> [--type] [--since] [--sort date|points] | comm
 # HN-specific research
 hn hiring [--kind hiring|wants-to-be-hired|freelancer] [--month YYYY-MM] [--keywords "a,b"] [--match any|all] [--limit 100] [--list]
 hn launches [--since 30d] [--batch S26] [--min-points N] [--sort date|points]
-hn digest --keywords "a,b,c" [--type] [--since 7d] [--min-points N] [--sort relevance|date]
+hn digest --keywords "a,b,c" [--type] [--since 7d] [--min-points N] [--sort relevance|date] [--limit 50]   # --limit is per keyword
 hn feed create <name> --keywords "…" [--type all] [--since 7d] [--min-points N]
 hn feed run <name> [--dry-run] | list | delete <name> --yes
 
@@ -94,7 +97,8 @@ hn status | hn config show | hn <command> --help
 |---|---|
 | "What's on the front page?" | `hn top --limit 30` |
 | "What was big this week?" | `hn search --since 7d --min-points 200 --sort date` (no `-q` needed) |
-| "What does HN think about X?" | `hn search -q "X" --since 1y --min-points 20` → top hits by `num_comments` → `hn thread get <id> --max-comments 100` |
+| "What does HN think about X?" | `hn digest --keywords "X,<synonym>,<synonym>" --since 1y --min-points 20` → merge buckets, keep on-topic titles, rank by `num_comments` → `hn thread get <id> --max-comments 100 --flat` |
+| "Find the exact phrase X" | `hn search -q "X" --since 1y` (words are ANDed — precise, narrower) |
 | "Summarize <HN URL>" | `hn thread get <url> --max-comments 150` |
 | "Only top-level comments" | `hn thread get <id> --depth 1` |
 | "What are commenters saying about X?" | `hn search -q "X" --comments --since 30d --limit 50` |
@@ -114,13 +118,15 @@ hn status | hn config show | hn <command> --help
 # Titles + points from the front page
 hn top | jq -r '.items[] | "\(.rank). \(.title) [\(.points)] \(.hn_url)"'
 
-# Most-discussed matches, then pull the top 3 threads
-hn search -q "local llm" --since 90d --limit 50 \
-  | jq -r '.items | sort_by(-.num_comments) | .[:3] | .[].id' \
-  | while read id; do hn thread get "$id" --max-comments 60 --flat; done
+# Topic pull: synonyms via digest → merge buckets → drop off-topic titles → rank → pull the top 3 threads
+hn digest --keywords "local llm,local models,llama.cpp,run locally" --since 90d --min-points 20 \
+  | jq -r '[.buckets[].items[]] | unique_by(.id) | map(select(.title | test("llm|model|local"; "i")))
+           | sort_by(-.num_comments) | .[:3] | .[].id' \
+  | while read id; do hn thread get "$id" --max-comments 100 --flat; done
 
-# Top-level comments of a thread as "author: text"
+# Top-level comments of a thread as "author: text" (two equivalent ways)
 hn thread get 8863 --depth 1 --flat | jq -r '.comments[] | "\(.author): \(.text // "" | .[0:300])"'
+hn thread get 8863 --flat | jq -r '.comments[] | select(.depth == 0) | "\(.author) [\(.reply_count) replies]: \(.text // "" | .[0:300])"'
 
 # One line per launch
 hn launches --since 60d | jq -r '.items[] | "\(.company) (\(.batch)) — \(.tagline) [\(.points) pts]"'
@@ -136,10 +142,16 @@ hn digest --keywords "cursor,claude code,codex" --since 7d | jq '.buckets[] | {k
 
 ### "What does HN think about X?"
 
-1. `hn search -q "X" --since 1y --min-points 20 --limit 50` — the index ranks by relevance weighted with points.
-2. Pick 3-5 hits with the highest `num_comments` (engagement beats points for opinions).
-3. `hn thread get <id> --max-comments 100` per hit. Top-level comments carry most of the signal; recurse into `replies` only for load-bearing threads.
+1. Cast a wide net. Algolia ANDs every query word, so `hn search -q "local llm"` misses the thread titled "…30B model for local agents". Use `digest` with 3-5 synonyms and merge the buckets:
+   ```bash
+   hn digest --keywords "X,<synonym>,<synonym>" --since 1y --min-points 20 \
+     | jq '[.buckets[].items[]] | unique_by(.id) | sort_by(-.num_comments)'
+   ```
+2. Keyword matching is lexical — read the titles before ranking (a "CheapFoodMap" post can outrank real hits). Keep 3-5 on-topic threads with the highest `num_comments`; engagement beats points for opinions.
+3. `hn thread get <id> --max-comments 100 --flat` per thread. Top-level comments (`depth == 0`) carry most of the signal; go deeper only for load-bearing sub-threads (`hn thread get <comment-id>`).
 4. Report with `hn_url` citations. Label findings as HN community opinion, not fact.
+
+`hn search -q "exact phrase"` is the right tool when the user names a specific product, error, or title — precise, but narrower.
 
 ### Thread summarization
 

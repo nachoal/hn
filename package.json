@@ -1,6 +1,6 @@
 {
   "name": "hn",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Agent-first CLI for Hacker News research — JSON output, no auth, Firebase + Algolia",
   "type": "module",
   "bin": {

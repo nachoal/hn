@@ -8,7 +8,7 @@ import { hideBin } from "yargs/helpers";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-var VERSION = "1.0.0";
+var VERSION = "1.0.1";
 function configDir() {
   return process.env.HN_CONFIG_DIR ?? join(homedir(), ".hn");
 }
