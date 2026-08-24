@@ -64,11 +64,20 @@ npm test                 # vitest run (mocked fetch)
 npm run lint             # tsc --noEmit
 ```
 
-**`dist/index.js` is committed and there is deliberately no `prepare` script.** `npm install -g github:nachoal/hn` must work with no toolchain: npm installs `github:` specs from the GitHub tarball and ships exactly the `files` whitelist (`dist`, `skills`, README, LICENSE). A `prepare` script would make npm clone and run a nested `npm install` that inherits global mode, which leaves the installed package directory empty (observed with npm 10.9). So: run `npm run build` and commit `dist/index.js` together with any source change. A local pre-commit hook (`.git/hooks/pre-commit`, not versioned) does this automatically in the primary clone:
+**`dist/index.js` is committed and there is deliberately no `prepare` script.** Users install with no toolchain. Run `npm run build` and commit `dist/index.js` together with any source change; a local pre-commit hook (`.git/hooks/pre-commit`, not versioned) does this automatically in the primary clone:
 
 ```bash
 #!/bin/sh
 npm run build --silent && git add dist/index.js
+```
+
+**Distribution = GitHub Release tarball.** `npm install -g github:nachoal/hn` was tested and is unreliable with npm 10.9: with a `prepare` script npm spawns a nested `npm install` that inherits global mode (leaves the package dir empty / `ENOTDIR` against an existing `npm link`); without one, the global install of the codeload tarball still produced nothing in a clean prefix, while the same spec as a project dependency installs correctly. A packed npm tarball installs globally without issues, so each version ships `hn-X.Y.Z.tgz` plus a version-less `hn.tgz` on a GitHub Release, and the README points at `releases/latest/download/hn.tgz`. Cutting a release:
+
+```bash
+npm version X.Y.Z --no-git-tag-version   # bump package.json (also update VERSION in src/config.ts), commit
+npm pack --pack-destination /tmp && cp /tmp/hn-X.Y.Z.tgz /tmp/hn.tgz
+git tag vX.Y.Z && git push --tags
+gh release create vX.Y.Z /tmp/hn-X.Y.Z.tgz /tmp/hn.tgz --title "hn vX.Y.Z" --notes "..."
 ```
 
 Config: `~/.hn/config.json` (`paceMs`, `timeoutMs`, `userAgent`); env overrides `HN_CONFIG_DIR`, `HN_PACE_MS`, `HN_TIMEOUT_MS`.

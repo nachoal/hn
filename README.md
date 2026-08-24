@@ -22,9 +22,11 @@ Hacker News has two public, keyless APIs and neither is enough on its own. The [
 Node 20+.
 
 ```bash
-npm install -g github:nachoal/hn      # prebuilt bundle, no toolchain needed
+npm install -g https://github.com/nachoal/hn/releases/latest/download/hn.tgz
 hn status                             # both APIs reachable?
 ```
+
+That is the packed npm tarball from the latest [release](https://github.com/nachoal/hn/releases) — prebuilt, no toolchain needed. (Plain `npm install -g github:nachoal/hn` is unreliable: npm's global installer mishandles GitHub specs on some setups; as a *project* dependency, `npm install github:nachoal/hn` works fine.)
 
 From a clone (what `install_global.sh` does: `npm install`, build, `npm link`, create `~/.hn/`):
 
