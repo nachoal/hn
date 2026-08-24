@@ -1,0 +1,4 @@
+interface:
+  display_name: "HN Hacker News Research"
+  short_description: "Use local hn for Hacker News research"
+  default_prompt: "Use $hn-hackernews-research to research this topic on Hacker News with the local hn CLI."
