@@ -64,7 +64,12 @@ npm test                 # vitest run (mocked fetch)
 npm run lint             # tsc --noEmit
 ```
 
-**`dist/index.js` is committed.** `npm install -g github:nachoal/hn` installs without devDependencies, so there is no toolchain to build at install time; `scripts/prepare.mjs` rebuilds when tsup is present (clone) and otherwise uses the committed bundle. Run `npm run build` and commit `dist/index.js` together with any source change.
+**`dist/index.js` is committed and there is deliberately no `prepare` script.** `npm install -g github:nachoal/hn` must work with no toolchain: npm installs `github:` specs from the GitHub tarball and ships exactly the `files` whitelist (`dist`, `skills`, README, LICENSE). A `prepare` script would make npm clone and run a nested `npm install` that inherits global mode, which leaves the installed package directory empty (observed with npm 10.9). So: run `npm run build` and commit `dist/index.js` together with any source change. A local pre-commit hook (`.git/hooks/pre-commit`, not versioned) does this automatically in the primary clone:
+
+```bash
+#!/bin/sh
+npm run build --silent && git add dist/index.js
+```
 
 Config: `~/.hn/config.json` (`paceMs`, `timeoutMs`, `userAgent`); env overrides `HN_CONFIG_DIR`, `HN_PACE_MS`, `HN_TIMEOUT_MS`.
 
