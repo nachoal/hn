@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup",
-    "prepare": "tsup",
+    "prepare": "node scripts/prepare.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"

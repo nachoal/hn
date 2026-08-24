@@ -22,7 +22,7 @@ Hacker News has two public, keyless APIs and neither is enough on its own. The [
 Node 20+.
 
 ```bash
-npm install -g github:nachoal/hn      # builds on install
+npm install -g github:nachoal/hn      # prebuilt bundle, no toolchain needed
 hn status                             # both APIs reachable?
 ```
 

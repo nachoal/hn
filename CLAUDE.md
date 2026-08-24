@@ -64,6 +64,8 @@ npm test                 # vitest run (mocked fetch)
 npm run lint             # tsc --noEmit
 ```
 
+**`dist/index.js` is committed.** `npm install -g github:nachoal/hn` installs without devDependencies, so there is no toolchain to build at install time; `scripts/prepare.mjs` rebuilds when tsup is present (clone) and otherwise uses the committed bundle. Run `npm run build` and commit `dist/index.js` together with any source change.
+
 Config: `~/.hn/config.json` (`paceMs`, `timeoutMs`, `userAgent`); env overrides `HN_CONFIG_DIR`, `HN_PACE_MS`, `HN_TIMEOUT_MS`.
 
 ---

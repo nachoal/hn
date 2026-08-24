@@ -1,5 +1,8 @@
 node_modules/
-dist/
+# dist/index.js is committed on purpose: `npm install -g github:nachoal/hn` installs without devDependencies,
+# so there is no toolchain to build it. Run `npm run build` before committing source changes.
+dist/*
+!dist/index.js
 .DS_Store
 *.log
 .env
